@@ -6,6 +6,7 @@ import * as fs from 'node:fs';
 import { SchemaAnalyzer } from './schema-analyzer.js';
 import inquirer from 'inquirer';
 import ora from 'ora';
+import { SchemaVisualizer } from './visualizer.js';
 
 // Set up command line interface
 const program = new Command();
@@ -104,6 +105,7 @@ program
   .command('analyze')
   .description('Analyze a GraphQL service using config file')
   .option('-c, --config <path>', 'Path to config file', 'graphql-visualizer.json')
+  .option('-o, --output <path>', 'Output path for visualization', 'schema-visualization.html')
   .action(async (options) => {
     // Check if config file exists
     if (!fs.existsSync(options.config)) {
@@ -120,6 +122,7 @@ program
       // Run analysis with configuration
       await runAnalysis({
         schema: config.schema,
+        output: options.output || config.output
       });
     } catch (error) {
       spinner.fail(`Analysis failed: ${error}`);
@@ -135,6 +138,7 @@ program.parse(process.argv);
  */
 async function runAnalysis(options: {
   schema: string;
+  output?: string;
 }) {
   // Create spinner for progress indication
   const spinner = ora('Starting GraphQL Analysis...').start();
@@ -144,10 +148,18 @@ async function runAnalysis(options: {
     const schemaAnalyzer = new SchemaAnalyzer();
     await schemaAnalyzer.loadSchema(options.schema);
     const schemaNodes = schemaAnalyzer.analyze();
-    console.log('[Post Schema Analysis]', schemaNodes);
     spinner.succeed('Schema analysis complete');
     
-    // 2. Analyze resolvers [WIP]
+    // 2. Generate visualization
+    spinner.text = 'Generating schema visualization...';
+    const visualizer = new SchemaVisualizer();
+    const html = visualizer.generateVisualization(schemaNodes);
+    
+    // 3. Save visualization
+    const outputPath = options.output || 'schema-visualization.html';
+    visualizer.saveVisualization(html, outputPath);
+    
+    spinner.succeed(`Visualization saved to ${outputPath}`);
   } catch (error) {
     spinner.fail(`Analysis failed: ${error}`);
     throw error;
